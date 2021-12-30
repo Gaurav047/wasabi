@@ -38,6 +38,41 @@ const userController = {
             return res.status(500).json({msg: error.message})
         }
     },
+    login: async (req, res) => {
+        try {
+            const {email, password} = req.body;
+
+            const user = await Users.findOne({email})
+            if(!user) return res.status(400).json({msg: "User does not exist."})
+
+            const isMatch = await bcrypt.compare(password, user.password)
+            if(!isMatch) return res.status(400).json({msg: "Incorrect Password."})
+
+            // If login success, create access token and refresh token
+            res.json({msg: "Login Success!"})
+
+            // Create jsonwebtoken to authenticate
+            const accessToken = createAccessToken({id: user._id})
+            const refreshToken = createRefreshToken({id: user._id})
+
+            res.cookie('refreshtoken', refreshtoken, {
+                httpOnly: true,
+                path: '/user/refresh_token'
+            })
+
+            res.json({accessToken})
+        } catch (error) {
+            return res.status(500).json({msg: error.message})
+        }
+    },
+    logout: async (req, res) => {
+        try {
+            res.clearCookie('refreshtoken', {path: '/user/refresh_token'})
+            return res.json({msg: "Logged out"})
+        } catch (error) {
+            return res.status(500).json({msg: error.message})
+        }
+    },
     refreshToken: (req, res) => {
         try {
             const rf_token = req.cookies.refreshtoken;
@@ -56,6 +91,16 @@ const userController = {
 
         
         res.json({rf_token})
+    },
+    getUser: async (req, res) => {
+        try {
+            const user = await Users.findById(req.user.id).select('~password')
+            if(!user) return res.status(400).json({msg: "User does not exist."})
+
+            res.json(user)
+        } catch (err) {
+            return res.status(500).json({msg: err.message})
+        }
     }
 }
 
